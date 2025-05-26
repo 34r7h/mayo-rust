@@ -10,7 +10,7 @@ export function keypair(mayo_variant_name: string): KeyPairWrapper;
  * This involves expanding the secret key and then calling `MAYO.Sign`.
  * The returned signature does not include the message.
  */
-export function sign(csk: CompactSecretKey, message: Message, mayo_variant_name: string): Signature;
+export function sign(csk: CompactSecretKey, message_bytes: Uint8Array, mayo_variant_name: string): Signature;
 /**
  * Verifies a signature on a "signed message" and recovers the original message if valid.
  * This corresponds to `sign_open` in some APIs.
@@ -92,7 +92,7 @@ export interface InitOutput {
   readonly __wbg_get_keypairwrapper_pk: (a: number) => number;
   readonly __wbg_set_keypairwrapper_pk: (a: number, b: number) => void;
   readonly keypair: (a: number, b: number) => [number, number, number];
-  readonly sign: (a: number, b: number, c: number, d: number) => [number, number, number];
+  readonly sign: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
   readonly open: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
   readonly hash_compact_secret_key: (a: number) => [number, number];
   readonly __wbindgen_exn_store: (a: number) => void;

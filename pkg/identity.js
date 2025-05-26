@@ -137,16 +137,17 @@ export function keypair(mayo_variant_name) {
  * This involves expanding the secret key and then calling `MAYO.Sign`.
  * The returned signature does not include the message.
  * @param {CompactSecretKey} csk
- * @param {Message} message
+ * @param {Uint8Array} message_bytes
  * @param {string} mayo_variant_name
  * @returns {Signature}
  */
-export function sign(csk, message, mayo_variant_name) {
+export function sign(csk, message_bytes, mayo_variant_name) {
     _assertClass(csk, CompactSecretKey);
-    _assertClass(message, Message);
-    const ptr0 = passStringToWasm0(mayo_variant_name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const ptr0 = passArray8ToWasm0(message_bytes, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.sign(csk.__wbg_ptr, message.__wbg_ptr, ptr0, len0);
+    const ptr1 = passStringToWasm0(mayo_variant_name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.sign(csk.__wbg_ptr, ptr0, len0, ptr1, len1);
     if (ret[2]) {
         throw takeFromExternrefTable0(ret[1]);
     }
