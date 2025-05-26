@@ -178,13 +178,13 @@ pub fn decode_p3_matrices(p3_bytes: &[u8], params: &MayoVariantParams) -> Result
 }
 
 /// Decodes L matrices from byte representation. (Not typically stored/decoded directly in MAYO standard)
-/// L consists of `m` matrices, each Li is `(n-o) x (n-o)`.
+/// L consists of `m` matrices, each Li is `(n-o) x o`.
 /// This function is provided as per subtask, but its usage in MAYO needs clarification.
 /// If L matrices are derived during verification and not directly part of keys/signatures,
 /// this might not be used in the main flow.
 pub fn decode_l_matrices(l_bytes: &[u8], params: &MayoVariantParams) -> Result<Vec<GFMatrix>, &'static str> {
     let rows_l = params.n - params.o;
-    let cols_l = params.n - params.o;
+    let cols_l = params.o;
     let num_elements_per_l_mat = rows_l * cols_l;
     let expected_total_elements = params.m * num_elements_per_l_mat;
     let elements = decode_gf_elements(l_bytes, expected_total_elements)?;
@@ -374,23 +374,28 @@ mod tests {
         // This suggests the function *should* decode m such matrices.
         // This is another parameter inconsistency.
 
-        // For L matrices (n-o)x(n-o) = 58x58
+        // For L matrices, now (n-o)xo
         // If L are full matrices: elems_l_one_mat = 58*58 = 3364. bytes_l_one_mat = 1682.
         // m * bytes_l_one_mat = 64 * 1682 = 107648.
         // This is just a structural check for the function decode_l_matrices
-        let l_test_bytes_per_mat = ( (5*5)+1 )/2; // for a 5x5 matrix = 13 bytes
         let l_test_m = 2;
-        let l_test_bytes = vec![0xFF; l_test_m * l_test_bytes_per_mat];
-        let mut l_dummy_params = params_variant.clone();
-        l_dummy_params.n = 5 + l_dummy_params.o; // so n-o = 5
+        let mut l_dummy_params = params_variant.clone(); // params_variant is MAYO1 (n=66, o=8, m=64)
+        // Let's define test L matrix dimensions: rows_l = 5, cols_l = 3
+        let test_l_rows = 5;
+        let test_l_cols = 3;
+        l_dummy_params.o = test_l_cols; // Set o to 3 for this test case
+        l_dummy_params.n = test_l_rows + l_dummy_params.o; // n = 5 + 3 = 8
         l_dummy_params.m = l_test_m;
+        let num_elements_per_l_mat_test = test_l_rows * test_l_cols; // 5 * 3 = 15 elements
+        let l_test_bytes_per_mat = (num_elements_per_l_mat_test + 1) / 2; // (15+1)/2 = 8 bytes
+        let l_test_bytes = vec![0xFF; l_test_m * l_test_bytes_per_mat]; // 2 * 8 = 16 bytes
         
         let l_mats_res = decode_l_matrices(&l_test_bytes, &l_dummy_params);
         assert!(l_mats_res.is_ok());
         let l_mats = l_mats_res.unwrap();
         assert_eq!(l_mats.len(), l_test_m);
-        assert_eq!(l_mats[0].num_rows(), 5);
-        assert_eq!(l_mats[0].num_cols(), 5);
+        assert_eq!(l_mats[0].num_rows(), test_l_rows); // Should be 5
+        assert_eq!(l_mats[0].num_cols(), test_l_cols); // Should be 3
     }
 
 

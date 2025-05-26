@@ -74,9 +74,9 @@ impl MayoParams {
             salt_bytes: 24,     // Corresponds to NIST's salt parameter for MAYO2
             digest_bytes: 32,   // For a 256-bit digest
             o_bytes: 540,       // From MAYO spec, Table 1 (G_bytes for MAYO2_PK)
-            p1_bytes: 117120,   // 64 * 1830 (calculated for 60x60 upper triangular)
-            p2_bytes: 23040,    // 64 * 360 (calculated for 60x18)
-            p3_bytes: 10944,    // 64 * 171 (calculated for 18x18 upper triangular)
+            p1_bytes: 58560,   // 64 * 1830 (calculated for 60x60 upper triangular)
+            p2_bytes: 34560,    // 64 * 360 (calculated for 60x18)
+            p3_bytes: 5504,    // 64 * 171 (calculated for 18x18 upper triangular)
         })
     }
 

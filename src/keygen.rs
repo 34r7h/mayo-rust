@@ -112,7 +112,7 @@ pub fn expand_sk(csk: &CompactSecretKey, params_enum: &MayoParams) -> Result<Exp
         l_elements_flat.extend_from_slice(&l_i.data);
     }
     let l_all_bytes = encode_gf_elements(&l_elements_flat);
-    let expected_l_elements = params.m * (params.n - params.o) * (params.n - params.o);
+    let expected_l_elements = params.m * (params.n - params.o) * params.o;
     let expected_l_bytes_len = MayoParams::bytes_for_gf16_elements(expected_l_elements);
     if l_all_bytes.len() != expected_l_bytes_len {
         return Err("L_all_bytes length mismatch during encoding");
@@ -230,11 +230,11 @@ mod tests {
         // p3_bytes: 10944
         assert_eq!(variant_params.sk_seed_bytes, 24);
         assert_eq!(variant_params.pk_seed_bytes, 16);
-        assert_eq!(variant_params.p3_bytes, 10944);
+        assert_eq!(variant_params.p3_bytes, 5504);
 
         let (csk, cpk) = compact_key_gen(&params_mayo2).unwrap();
         assert_eq!(csk.0.len(), 24);
-        assert_eq!(cpk.0.len(), 16 + 10944);
+        assert_eq!(cpk.0.len(), 16 + 5504);
     }
 
     fn test_expand_sk_for_variant(params_enum: &MayoParams) {
@@ -272,7 +272,7 @@ mod tests {
         
         // Verify L_all_bytes length
         let l_bytes_start = p1_bytes_end;
-        let num_l_elements = params_variant.m * (params_variant.n - params_variant.o) * (params_variant.n - params_variant.o);
+        let num_l_elements = params_variant.m * (params_variant.n - params_variant.o) * params_variant.o;
         let expected_l_bytes_len = MayoParams::bytes_for_gf16_elements(num_l_elements);
         assert_eq!(esk.0.len(), params_variant.sk_seed_bytes + params_variant.o_bytes + params_variant.p1_bytes + expected_l_bytes_len,
                    "Total ESK length mismatch");
