@@ -1,0 +1,15 @@
+{
+  "name": "identity",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "identity_bg.wasm",
+    "identity.js",
+    "identity.d.ts"
+  ],
+  "main": "identity.js",
+  "types": "identity.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
