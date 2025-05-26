@@ -66,6 +66,7 @@ impl CompactSecretKey {
         Self(bytes)
     }
 
+    #[wasm_bindgen]
     pub fn get_bytes(&self) -> Vec<u8> {
         self.0.clone()
     }
@@ -83,6 +84,7 @@ impl CompactPublicKey {
         Self(bytes)
     }
 
+    #[wasm_bindgen]
     pub fn get_bytes(&self) -> Vec<u8> {
         self.0.clone()
     }
