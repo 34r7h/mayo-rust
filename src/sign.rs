@@ -108,7 +108,7 @@ pub fn sign_message(esk: &ExpandedSecretKey, message: &Message, params_enum: &Ma
     let o_bytes_len = params.o_bytes;
     let p1_all_bytes_len = params.p1_bytes;
     // L_all_bytes length is the rest, or can be calculated:
-    let num_l_elements = params.m * (params.n - params.o) * (params.n - params.o);
+    let num_l_elements = params.m * (params.n - params.o) * params.o;
     let l_all_bytes_len_expected = MayoParams::bytes_for_gf16_elements(num_l_elements);
 
     if esk.0.len() != seedsk_bytes_len + o_bytes_len + p1_all_bytes_len + l_all_bytes_len_expected {

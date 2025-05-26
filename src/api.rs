@@ -103,7 +103,7 @@ mod tests {
         let cpk2 = wrapper2.pk;
         let params_mayo2 = MayoParams::mayo2(); // For assertion values
         assert_eq!(csk2.0.len(), params_mayo2.sk_seed_bytes());
-        assert_eq!(cpk2.0.len(), params_mayo2.pk_seed_bytes() + 10944);
+        assert_eq!(cpk2.0.len(), params_mayo2.pk_seed_bytes() + 5504);
     }
 
     #[cfg(target_arch = "wasm32")]
