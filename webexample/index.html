@@ -33,9 +33,9 @@
         const signBtn = document.getElementById('sign-message');
         const verifyBtn = document.getElementById('verify-signature');
 
-        let csk_bytes = null;
-        let cpk_bytes = null;
-        let signature_bytes = null;
+        let csk_object = null; // Renamed from csk_bytes
+        let cpk_object = null; // Renamed from cpk_bytes
+        let signature_object = null; // Renamed from signature_bytes
         const message = new TextEncoder().encode("This is a test message");
 
         function appendOutput(text) {
@@ -71,8 +71,8 @@
             appendOutput(`Generating keys for ${mayo_variant}...`);
             try {
                 const keypair_wrapper = keypair(mayo_variant);
-                csk_bytes = keypair_wrapper.sk.get_bytes(); // Use get_bytes()
-                cpk_bytes = keypair_wrapper.pk.get_bytes(); // Use get_bytes()
+                csk_object = keypair_wrapper.sk; // Store the object directly
+                cpk_object = keypair_wrapper.pk; // Store the object directly
 
                 // keypair_wrapper.free(); // Consider if sk or pk objects themselves need freeing if get_bytes() clones.
                                         // If CompactSecretKey/CompactPublicKey are #[wasm_bindgen(getter_with_clone)]
@@ -84,8 +84,8 @@
                                         // Let's defer explicit freeing unless memory issues are observed.
 
                 appendOutput('Compact keys generated successfully.');
-                appendOutput(`  CSK length: ${csk_bytes.length} bytes`);
-                appendOutput(`  CPK length: ${cpk_bytes.length} bytes`);
+                appendOutput(`  CSK length: ${csk_object.get_bytes().length} bytes`); // Use get_bytes() for length
+                appendOutput(`  CPK length: ${cpk_object.get_bytes().length} bytes`); // Use get_bytes() for length
                 // Removed logging for esk_bytes and epk_bytes
 
                 setButtonState(true, false, true); // Enable sign button
@@ -101,10 +101,11 @@
             const mayo_variant = "mayo1";
             appendOutput(`Signing message with ${mayo_variant}...`);
              try {
-                signature_bytes = sign(csk_bytes, message, mayo_variant); // Call new 'sign' function
+                const sig_obj = sign(csk_object, message, mayo_variant); // Use csk_object
+                signature_object = sig_obj; // Store the signature object
 
                 appendOutput('Message signed successfully.');
-                appendOutput(`  Signature length: ${signature_bytes.length} bytes`);
+                appendOutput(`  Signature length: ${signature_object.get_bytes().length} bytes`); // Use get_bytes() for length
 
                 setButtonState(true, true, false); // Enable verify button
             } catch (e) {
@@ -120,11 +121,12 @@
             appendOutput(`Verifying signature with ${mayo_variant}...`);
              try {
                 // Construct signed_message = signature_bytes || message
-                let signed_message_js = new Uint8Array(signature_bytes.length + message.length);
-                signed_message_js.set(signature_bytes);
-                signed_message_js.set(message, signature_bytes.length);
+                let actual_signature_bytes = signature_object.get_bytes(); // Get bytes from signature_object
+                let signed_message_js = new Uint8Array(actual_signature_bytes.length + message.length);
+                signed_message_js.set(actual_signature_bytes);
+                signed_message_js.set(message, actual_signature_bytes.length);
 
-                const recovered_message_option = open(cpk_bytes, signed_message_js, mayo_variant); // Call new 'open'
+                const recovered_message_option = open(cpk_object, signed_message_js, mayo_variant); // Use cpk_object
 
                 if (recovered_message_option) {
                     // Optional: Compare recovered_message_option with original message for completeness

@@ -8,9 +8,9 @@ use crate::params::{MayoParams, MayoVariantParams};
 use crate::hash::{shake256_digest, shake256_derive_target_t, shake256_xof_derive_pk_seed_and_o, shake256_xof_derive_p3};
 use crate::aes_ctr::derive_p2_bytes; // Removed derive_p1_bytes
 use crate::codec::{
-    decode_o_matrix, decode_p1_matrices, decode_p2_matrices, decode_l_matrices,
-    decode_gf_elements, encode_s_vector, decode_p3_matrices
+    decode_p1_matrices, decode_l_matrices, decode_gf_elements, encode_s_vector
 };
+// Removed: decode_o_matrix, decode_p2_matrices, decode_p3_matrices
 use crate::types::GFMatrix;
 use crate::matrix::{
     matrix_sub_vectors_gfvector, matrix_symmetrize, 
@@ -98,7 +98,7 @@ fn compute_lin_system_components(
 
 /// Implements MAYO.Sign (Algorithm 8 from the MAYO specification).
 /// Generates a signature for a given message using an expanded secret key.
-pub fn sign_message(esk: &ExpandedSecretKey, message: &Message, params_enum: &MayoParams) -> Result<Signature, &'static str> {
+pub fn sign_message(esk: &ExpandedSecretKey, message: &Message, params_enum: &MayoParams) -> Result<Signature, String> {
     let params = params_enum.variant();
 
     // 1. Parse esk and re-derive necessary components
@@ -112,7 +112,7 @@ pub fn sign_message(esk: &ExpandedSecretKey, message: &Message, params_enum: &Ma
     let l_all_bytes_len_expected = MayoParams::bytes_for_gf16_elements(num_l_elements);
 
     if esk.0.len() != seedsk_bytes_len + o_bytes_len + p1_all_bytes_len + l_all_bytes_len_expected {
-        return Err("Expanded secret key has incorrect total length based on components");
+        return Err("Expanded secret key has incorrect total length based on components".to_string());
     }
 
     let seedsk_bytes_slice = &esk.0[0..seedsk_bytes_len];
@@ -123,13 +123,13 @@ pub fn sign_message(esk: &ExpandedSecretKey, message: &Message, params_enum: &Ma
     let l_all_bytes_slice = &esk.0[seedsk_bytes_len + o_bytes_len + p1_all_bytes_len ..];
     
     if l_all_bytes_slice.len() != l_all_bytes_len_expected {
-        return Err("L_all_bytes component of ESK has unexpected length");
+        return Err("L_all_bytes component of ESK has unexpected length".to_string());
     }
 
     // Re-derive seedpk to get P2_bytes and P3_bytes (P1_bytes also re-derived for consistency, though available in esk)
     let (seedpk, derived_o_bytes) = shake256_xof_derive_pk_seed_and_o(&seedsk, params_enum);
     if derived_o_bytes.as_slice() != o_bytes_slice { // Compare Vec<u8> with &[u8]
-        return Err("O_bytes in ESK does not match derivation from seedsk in ESK");
+        return Err("O_bytes in ESK does not match derivation from seedsk in ESK".to_string());
     }
     
     // P1 matrices can be decoded from esk's p1_all_bytes, or re-derived from seedpk.
@@ -138,39 +138,43 @@ pub fn sign_message(esk: &ExpandedSecretKey, message: &Message, params_enum: &Ma
     // So, we should use P1_all_bytes from esk.
     let p1_all_bytes_from_esk_slice = &esk.0[seedsk_bytes_len + o_bytes_len .. seedsk_bytes_len + o_bytes_len + p1_all_bytes_len];
 
-    let p1_matrices = decode_p1_matrices(p1_all_bytes_from_esk_slice, params)?;
+    let p1_matrices = decode_p1_matrices(p1_all_bytes_from_esk_slice, params).map_err(|e_str| e_str.to_string())?;
     
     // P2 and P3 are not in esk, they are derived from seedpk.
-    let p2_all_bytes_from_seedpk = derive_p2_bytes(&seedpk, params);
-    let p3_all_bytes_from_seedpk = shake256_xof_derive_p3(&seedpk, params_enum);
+    let _p2_all_bytes_from_seedpk = derive_p2_bytes(&seedpk, params); // Renamed as it's not used directly after this
+    let _p3_all_bytes_from_seedpk = shake256_xof_derive_p3(&seedpk, params_enum); // Renamed
 
-    let _p2_matrices = decode_p2_matrices(&p2_all_bytes_from_seedpk, params)?; // Prefixed
-    let _p3_matrices = decode_p3_matrices(&p3_all_bytes_from_seedpk, params)?; // Prefixed
+    // _p2_matrices was here
+    // _p3_matrices was here
     
     // O and L matrices are from esk.
-    let _o_matrix = decode_o_matrix(o_bytes_slice, params)?; // Prefixed
-    let l_matrices = decode_l_matrices(l_all_bytes_slice, params)?;
+    // _o_matrix was here
+    let l_matrices = decode_l_matrices(l_all_bytes_slice, params).map_err(|e_str| e_str.to_string())?;
 
 
     // 2. Hash message M to M_digest
     let m_digest = shake256_digest(&message.0, params_enum);
+    
+    let mut no_solution_count = 0;
+    let mut solver_error_count = 0;
+    let mut last_solver_error: Option<&'static str> = None;
 
     for _retry_count in 0..MAX_SIGN_RETRIES {
         // 3. Sample salt
         let mut salt_bytes_vec = vec![0u8; params.salt_bytes];
-        getrandom(&mut salt_bytes_vec).map_err(|_| "Failed to generate random salt")?;
+        getrandom(&mut salt_bytes_vec).map_err(|_| "Failed to generate random salt".to_string())?;
         let salt = Salt(salt_bytes_vec);
 
         // 4. Derive target vector t
         let t_bytes = shake256_derive_target_t(&m_digest, &salt, params_enum);
-        let t_vector = decode_gf_elements(&t_bytes, params.m)?;
+        let t_vector = decode_gf_elements(&t_bytes, params.m).map_err(|e_str| e_str.to_string())?;
 
         // 5. Sample random vinegar variables (n-o variables)
         let num_vinegar_vars = params.n - params.o;
         let mut vinegar_vars_vec = Vec::with_capacity(num_vinegar_vars);
         for _ in 0..num_vinegar_vars {
             let mut v_byte = [0u8;1];
-            getrandom(&mut v_byte).map_err(|_| "Failed to generate random vinegar variable")?;
+            getrandom(&mut v_byte).map_err(|_| "Failed to generate random vinegar variable".to_string())?;
             vinegar_vars_vec.push(GFElement(v_byte[0] & 0x0F)); // Ensure it's a nibble
         }
         let vinegar_vars = vinegar_vars_vec;
@@ -182,22 +186,17 @@ pub fn sign_message(esk: &ExpandedSecretKey, message: &Message, params_enum: &Ma
             &vinegar_vars, &p1_matrices, &l_matrices, params
         ) {
             Ok(res) => res,
-            // If compute_lin_system_components is the one returning "Not yet implemented", update this.
-            // However, we are now implementing it.
-            // Err(e) if e == "compute_Y_A_yprime_and_s_components: Not yet implemented" => {
-            //     return Err("MAYO.Sign math core (compute_Y_A_yprime_and_s_components) not implemented");
-            // }
-            Err(e) => return Err(e), 
+            Err(e) => return Err(e.to_string()), 
         };
 
         // 7. Solve Ax = t - y_prime for x (o elements - oil variables)
-        let target_for_solver = matrix_sub_vectors_gfvector(&t_vector, &y_prime_vector)?;
+        let target_for_solver = matrix_sub_vectors_gfvector(&t_vector, &y_prime_vector).map_err(|e_str| e_str.to_string())?;
         
         match solve_linear_system(&a_matrix, &target_for_solver) {
             Ok(Some(x_solution_oils)) => { // x_solution_oils has 'o' elements
                 if x_solution_oils.len() != params.o {
                     // Should be guaranteed by solver if A is m x o.
-                    return Err("Solver returned oil solution of incorrect length");
+                    return Err("Solver returned oil solution of incorrect length".to_string());
                 }
                 // 8. Construct signature vector s (n elements = n-o vinegar + o oil)
                 let mut s_elements: GFVector = Vec::with_capacity(params.n);
@@ -213,31 +212,34 @@ pub fn sign_message(esk: &ExpandedSecretKey, message: &Message, params_enum: &Ma
                 
                 return Ok(Signature(sig_bytes));
             }
-            Ok(None) => continue, // No solution, try next salt
+            Ok(None) => {
+                no_solution_count += 1;
+                continue;
+            }
             Err(e) => {
-                // Log solver error if possible, then continue or return based on policy
-                // For now, let's assume solver errors are fatal for this attempt.
-                // Depending on the error, it might be retryable.
-                eprintln!("Solver error: {}", e); // Temporary, not suitable for wasm/lib
-                continue; // Or return Err(e) if solver errors are not to be retried.
+                solver_error_count += 1;
+                last_solver_error = Some(e);
+                // eprintln!("Solver error: {}", e); // Keep for local debugging if desired, but will be in final error string
+                continue;
             }
         }
     }
-    Err("MAYO.Sign failed after maximum retries")
+    Err(format!("MAYO.Sign failed after maximum retries ({} attempts). No solution found: {} times. Solver errored: {} times. Last solver error: {:?}", MAX_SIGN_RETRIES, no_solution_count, solver_error_count, last_solver_error))
 }
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{CompactSecretKey, ExpandedSecretKey as EskTypeForTest}; // Renamed to avoid conflict
+    // use crate::types::{CompactSecretKey, ExpandedSecretKey as EskTypeForTest}; // Renamed to avoid conflict
+    use crate::types::ExpandedSecretKey as EskTypeForTest;
     use crate::params::MayoParams;
     use crate::keygen::{compact_key_gen, expand_sk}; // For generating esk
 
     // Helper to create a dummy ESK for testing the flow
     // This is complex because ESK structure is seedsk | O_bytes | P1_bytes | L_bytes
     fn create_dummy_esk(params_enum: &MayoParams) -> EskTypeForTest {
-        let params = params_enum.variant();
+        // let params = params_enum.variant(); // Unused
         let (csk, _cpk) = compact_key_gen(params_enum).unwrap();
         expand_sk(&csk, params_enum).unwrap() // Use the actual expand_sk
     }
@@ -252,18 +254,19 @@ mod tests {
         let sign_result = sign_message(&esk, &message, &params_enum);
         
         // With compute_lin_system_components implemented, we expect either Ok (if solvable by chance)
-        // or Err from solver or "MAYO.Sign failed after maximum retries".
+        // or Err from solver or the detailed "MAYO.Sign failed after maximum retries..." string.
         // For this test, we are checking that it doesn't panic and proceeds past component computation.
         // If it returns Ok, A and y_prime were computed with correct dimensions.
-        // A more specific error than the placeholder is expected now.
         match sign_result {
             Ok(sig) => {
                 let expected_sig_len = MayoParams::bytes_for_gf16_elements(params_variant.n) + params_variant.salt_bytes;
                 assert_eq!(sig.0.len(), expected_sig_len, "Signature length is incorrect");
             },
-            Err(e) => {
-                assert!(e == "MAYO.Sign failed after maximum retries" || e.starts_with("Solver error"), 
-                        "Expected sign failure or solver error, got: {}", e);
+            Err(e_string) => { // e_string is now String
+                assert!(
+                    e_string.contains("MAYO.Sign failed after maximum retries") || e_string.contains("Solver error"),
+                    "Expected sign failure (max retries or solver error), got: {}", e_string
+                );
             }
         }
     }
@@ -281,9 +284,11 @@ mod tests {
                 let expected_sig_len = MayoParams::bytes_for_gf16_elements(params_variant.n) + params_variant.salt_bytes;
                 assert_eq!(sig.0.len(), expected_sig_len, "Signature length is incorrect");
             },
-            Err(e) => {
-                assert!(e == "MAYO.Sign failed after maximum retries" || e.starts_with("Solver error"), 
-                        "Expected sign failure or solver error, got: {}", e);
+            Err(e_string) => { // e_string is now String
+                assert!(
+                    e_string.contains("MAYO.Sign failed after maximum retries") || e_string.contains("Solver error"),
+                    "Expected sign failure (max retries or solver error), got: {}", e_string
+                );
             }
         }
     }
