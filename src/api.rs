@@ -27,7 +27,7 @@ pub fn keypair(mayo_variant_name: String) -> Result<KeyPairWrapper, JsValue> {
 /// This involves expanding the secret key and then calling `MAYO.Sign`.
 /// The returned signature does not include the message.
 #[wasm_bindgen]
-pub fn sign(csk: &CompactSecretKey, message: &Message, mayo_variant_name: String) -> Result<Signature, JsValue> {
+pub fn sign(csk: &CompactSecretKey, message_bytes: &[u8], mayo_variant_name: String) -> Result<Signature, JsValue> {
     let params_enum = MayoParams::get_params_by_name(&mayo_variant_name).map_err(|e| JsValue::from_str(&e))?;
     // Note: The problem description mentions ExpandedSecretKey is not used by sign.
     // However, the provided function signature for sign_message in sign.rs *does* take ExpandedSecretKey.
@@ -35,7 +35,8 @@ pub fn sign(csk: &CompactSecretKey, message: &Message, mayo_variant_name: String
     // Algorithm 3 (NIST API Sign) takes sk (csk) as input, implying internal expansion.
     // So, expanding sk to esk here is correct.
     let esk: ExpandedSecretKey = expand_sk(csk, &params_enum).map_err(|e| JsValue::from_str(e))?;
-    sign_message(&esk, message, &params_enum).map_err(|e| JsValue::from_str(e))
+    let message_to_sign = Message(message_bytes.to_vec());
+    sign_message(&esk, &message_to_sign, &params_enum).map_err(|e| JsValue::from_str(e))
 }
 
 /// Verifies a signature on a "signed message" and recovers the original message if valid.
