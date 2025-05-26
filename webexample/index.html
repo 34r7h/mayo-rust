@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAYO Wasm Example</title>
+    <style>
+        pre {
+            white-space: pre-wrap; /* Ensure text wraps and respects newlines */
+            word-wrap: break-word;
+            background-color: #f0f0f0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            min-height: 50px; /* Give it some initial height */
+        }
+    </style>
+</head>
+<body>
+    <h1>MAYO Wasm Demo</h1>
+
+    <button id="generate-keys">Generate Keys</button>
+    <button id="sign-message" disabled>Sign Message</button>
+    <button id="verify-signature" disabled>Verify Signature</button>
+
+    <h2>Output:</h2>
+    <pre id="output"></pre>
+
+    <script type="module">
+        import init, { compact_key_gen_wasm, expand_sk_wasm, expand_pk_wasm, sign_message_wasm, verify_signature_wasm } from '../pkg/identity.js';
+
+        const output = document.getElementById('output');
+        const generateBtn = document.getElementById('generate-keys');
+        const signBtn = document.getElementById('sign-message');
+        const verifyBtn = document.getElementById('verify-signature');
+
+        let csk_bytes = null;
+        let cpk_bytes = null;
+        let esk_bytes = null;
+        let epk_bytes = null;
+        let signature_bytes = null;
+        const message = new TextEncoder().encode("This is a test message");
+
+        function appendOutput(text) {
+            const textNode = document.createTextNode(text + '\n');
+            output.appendChild(textNode);
+            // Auto-scroll to bottom
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function setButtonState(generate, sign, verify) {
+            generateBtn.disabled = generate;
+            signBtn.disabled = sign;
+            verifyBtn.disabled = verify;
+        }
+
+        async function run() {
+            appendOutput('Loading Wasm...');
+            setButtonState(true, true, true); // Disable all buttons initially
+            try {
+                await init();
+                appendOutput('Wasm loaded successfully.');
+                setButtonState(false, true, true); // Enable generate button
+            } catch (e) {
+                appendOutput(`Error loading Wasm: ${e}`);
+                console.error('Error loading Wasm:', e);
+                // Buttons remain disabled on Wasm load failure
+            }
+        }
+
+        generateBtn.addEventListener('click', () => {
+            setButtonState(true, true, true); // Disable buttons
+            appendOutput('Generating keys...');
+            try {
+                const keypair = compact_key_gen_wasm();
+                csk_bytes = keypair.csk_bytes;
+                cpk_bytes = keypair.cpk_bytes;
+
+                esk_bytes = expand_sk_wasm(csk_bytes);
+                epk_bytes = expand_pk_wasm(cpk_bytes);
+
+                appendOutput('Keys generated and expanded successfully.');
+                appendOutput(`  CSK length: ${csk_bytes.length} bytes`);
+                appendOutput(`  CPK length: ${cpk_bytes.length} bytes`);
+                appendOutput(`  ESK length: ${esk_bytes.length} bytes`);
+                appendOutput(`  EPK length: ${epk_bytes.length} bytes`);
+
+                setButtonState(true, false, true); // Enable sign button
+            } catch (e) {
+                appendOutput(`Error generating keys: ${e}`);
+                console.error('Error generating keys:', e);
+                setButtonState(false, true, true); // Re-enable generate on error
+            }
+        });
+
+        signBtn.addEventListener('click', () => {
+            setButtonState(true, true, true); // Disable buttons
+            appendOutput('Signing message...');
+             try {
+                signature_bytes = sign_message_wasm(esk_bytes, message);
+                appendOutput('Message signed successfully.');
+                appendOutput(`  Signature length: ${signature_bytes.length} bytes`);
+
+                setButtonState(true, true, false); // Enable verify button
+            } catch (e) {
+                appendOutput(`Error signing message: ${e}`);
+                console.error('Error signing message:', e);
+                setButtonState(true, false, true); // Re-enable sign on error
+            }
+        });
+
+         verifyBtn.addEventListener('click', () => {
+            setButtonState(true, true, true); // Disable buttons
+            appendOutput('Verifying signature...');
+             try {
+                const is_valid = verify_signature_wasm(epk_bytes, message, signature_bytes);
+                appendOutput(`Verification result: ${is_valid}`);
+                 // Keep buttons disabled after final verification step, unless error
+            } catch (e) {
+                appendOutput(`Error verifying signature: ${e}`);
+                console.error('Error verifying signature:', e);
+                setButtonState(true, true, false); // Re-enable verify on error
+            }
+         });
+
+        run();
+    </script>
+</body>
+</html> 
