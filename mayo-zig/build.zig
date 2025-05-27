@@ -57,5 +57,23 @@ pub fn build(b: *std.Build) void {
     });
 
     const test_step = b.step("test", "Run library tests");
-    test_step.dependOn(&main_tests.step);
+    const run_main_tests = b.addRunArtifact(main_tests);
+    test_step.dependOn(&run_main_tests.step);
+
+    // --- KAT Test Step ---
+    const kat_tests = b.addTest(.{
+        .root_source_file = b.path("test/kat_test.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // Define the src module, using lib.zig as the root file
+    const src_module = b.addModule("src", .{ .root_source_file = b.path("src/lib.zig") });
+
+    // Add the src module as an import named "src" to the KAT test's root module
+    // This makes components imported/declared in src/lib.zig available via `@import("src")`
+    kat_tests.root_module.addImport("src", src_module);
+
+    const run_kat_tests = b.addRunArtifact(kat_tests);
+    test_step.dependOn(&run_kat_tests.step);
 }
