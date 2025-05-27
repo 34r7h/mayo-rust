@@ -26,16 +26,18 @@
     <pre id="output"></pre>
 
     <script type="module">
-        import init, { keypair, sign, open } from '../pkg/identity.js';
+        import init, { compact_key_gen_wasm, expand_sk_wasm, expand_pk_wasm, sign_message_wasm, verify_signature_wasm } from '../pkg/identity.js';
 
         const output = document.getElementById('output');
         const generateBtn = document.getElementById('generate-keys');
         const signBtn = document.getElementById('sign-message');
         const verifyBtn = document.getElementById('verify-signature');
 
-        let csk_object = null; // Renamed from csk_bytes
-        let cpk_object = null; // Renamed from cpk_bytes
-        let signature_object = null; // Renamed from signature_bytes
+        let csk_bytes = null;
+        let cpk_bytes = null;
+        let esk_bytes = null;
+        let epk_bytes = null;
+        let signature_bytes = null;
         const message = new TextEncoder().encode("This is a test message");
 
         function appendOutput(text) {
@@ -67,26 +69,20 @@
 
         generateBtn.addEventListener('click', () => {
             setButtonState(true, true, true); // Disable buttons
-            const mayo_variant = "mayo1";
-            appendOutput(`Generating keys for ${mayo_variant}...`);
+            appendOutput('Generating keys...');
             try {
-                const keypair_wrapper = keypair(mayo_variant);
-                csk_object = keypair_wrapper.sk; // Store the object directly
-                cpk_object = keypair_wrapper.pk; // Store the object directly
+                const keypair = compact_key_gen_wasm();
+                csk_bytes = keypair.csk_bytes;
+                cpk_bytes = keypair.cpk_bytes;
 
-                // keypair_wrapper.free(); // Consider if sk or pk objects themselves need freeing if get_bytes() clones.
-                                        // If CompactSecretKey/CompactPublicKey are #[wasm_bindgen(getter_with_clone)]
-                                        // and get_bytes returns Vec<u8> (which becomes Uint8Array),
-                                        // the original JS objects keypair_wrapper.sk and keypair_wrapper.pk might need freeing
-                                        // if they are not immediately garbage collected.
-                                        // For now, let's assume wasm-bindgen handles this reasonably.
-                                        // The keypair_wrapper itself might also need freeing: keypair_wrapper.free();
-                                        // Let's defer explicit freeing unless memory issues are observed.
+                esk_bytes = expand_sk_wasm(csk_bytes);
+                epk_bytes = expand_pk_wasm(cpk_bytes);
 
-                appendOutput('Compact keys generated successfully.');
-                appendOutput(`  CSK length: ${csk_object.get_bytes().length} bytes`); // Use get_bytes() for length
-                appendOutput(`  CPK length: ${cpk_object.get_bytes().length} bytes`); // Use get_bytes() for length
-                // Removed logging for esk_bytes and epk_bytes
+                appendOutput('Keys generated and expanded successfully.');
+                appendOutput(`  CSK length: ${csk_bytes.length} bytes`);
+                appendOutput(`  CPK length: ${cpk_bytes.length} bytes`);
+                appendOutput(`  ESK length: ${esk_bytes.length} bytes`);
+                appendOutput(`  EPK length: ${epk_bytes.length} bytes`);
 
                 setButtonState(true, false, true); // Enable sign button
             } catch (e) {
@@ -98,14 +94,11 @@
 
         signBtn.addEventListener('click', () => {
             setButtonState(true, true, true); // Disable buttons
-            const mayo_variant = "mayo1";
-            appendOutput(`Signing message with ${mayo_variant}...`);
+            appendOutput('Signing message...');
              try {
-                const sig_obj = sign(csk_object, message, mayo_variant); // Use csk_object
-                signature_object = sig_obj; // Store the signature object
-
+                signature_bytes = sign_message_wasm(esk_bytes, message);
                 appendOutput('Message signed successfully.');
-                appendOutput(`  Signature length: ${signature_object.get_bytes().length} bytes`); // Use get_bytes() for length
+                appendOutput(`  Signature length: ${signature_bytes.length} bytes`);
 
                 setButtonState(true, true, false); // Enable verify button
             } catch (e) {
@@ -117,28 +110,11 @@
 
          verifyBtn.addEventListener('click', () => {
             setButtonState(true, true, true); // Disable buttons
-            const mayo_variant = "mayo1";
-            appendOutput(`Verifying signature with ${mayo_variant}...`);
+            appendOutput('Verifying signature...');
              try {
-                // Construct signed_message = signature_bytes || message
-                let actual_signature_bytes = signature_object.get_bytes(); // Get bytes from signature_object
-                let signed_message_js = new Uint8Array(actual_signature_bytes.length + message.length);
-                signed_message_js.set(actual_signature_bytes);
-                signed_message_js.set(message, actual_signature_bytes.length);
-
-                const recovered_message_option = open(cpk_object, signed_message_js, mayo_variant); // Use cpk_object
-
-                if (recovered_message_option) {
-                    // Optional: Compare recovered_message_option with original message for completeness
-                    let messages_match = recovered_message_option.length === message.length && 
-                                         recovered_message_option.every((val, idx) => val === message[idx]);
-                    appendOutput(`Verification successful: true`);
-                    appendOutput(`  Recovered message matches original: ${messages_match}`);
-                } else {
-                    appendOutput(`Verification successful: false (signature invalid or error)`);
-                }
-                // Keep buttons disabled or reset as appropriate after verification
-                setButtonState(true, true, true); // Example: disable all after one full cycle.
+                const is_valid = verify_signature_wasm(epk_bytes, message, signature_bytes);
+                appendOutput(`Verification result: ${is_valid}`);
+                 // Keep buttons disabled after final verification step, unless error
             } catch (e) {
                 appendOutput(`Error verifying signature: ${e}`);
                 console.error('Error verifying signature:', e);

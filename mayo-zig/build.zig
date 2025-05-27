@@ -16,7 +16,8 @@ pub fn build(b: *std.Build) void {
     // This is a simple way for now; more advanced builds might selectively add files.
     // Note: This assumes all .zig files in src/ are part of the library.
     // If some are not (e.g. main.zig for an executable), this would need adjustment.
-    lib_native.addPackagePath("main", "src/lib.zig"); // Example of how to make modules available
+    const main_module = b.addModule("main", .{ .root_source_file = b.path("src/lib.zig") });
+    lib_native.root_module.addImport("main", main_module);
     // A more direct way for simple libraries is often to let `lib.zig` import other files,
     // and those imports will be resolved by the compiler.
     // For now, `lib.zig` will be the entry point that pulls in other modules.
