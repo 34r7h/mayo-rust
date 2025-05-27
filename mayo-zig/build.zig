@@ -25,7 +25,7 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(lib_native);
 
     // --- WASM32 Shared Library ---
-    const lib_wasm = b.addSharedLibrary(.{
+    const lib_wasm = b.addStaticLibrary(.{
         .name = "mayo_wasm",
         .root_source_file = b.path("src/lib.zig"),
         .target = b.resolveTargetQuery(.{
